@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #111827; /* bg-gray-900 */
+            --text-color: #f3f4f6; /* text-gray-100 */
+            --prompt-color: #4ade80; /* text-green-400 */
+            --cyan-color: #22d3ee; /* text-cyan-400 */
+            --blue-color: #60a5fa; /* text-blue-400 */
+            --card-bg-color: #1f2937; /* bg-gray-800 */
+        }
+        body {
+            font-family: 'Fira Code', monospace;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+        }
+        #input {
+            background-color: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-color);
+            font-family: 'Fira Code', monospace;
+            font-size: 1rem;
+            width: 100%;
+            caret-color: var(--text-color);
+        }
+        #terminal-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative; /* Needed for matrix canvas */
+        }
+        #terminal {
+            flex-grow: 1;
+            overflow-y: auto;
+            position: relative;
+            z-index: 2;
+        }
+        .prompt-color { color: var(--prompt-color); }
+        .cyan-color { color: var(--cyan-color); }
+        .blue-color { color: var(--blue-color); }
+        .card-bg-color { background-color: var(--card-bg-color); }
+        
+        /* --- ANIMATIONS --- */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeInLeft {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes zoomIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        @keyframes glitch {
+            2%,64% { transform: translate(2px,0) skew(0deg); }
+            4%,60% { transform: translate(-2px,0) skew(0deg); }
+            62% { transform: translate(0,0) skew(5deg); }
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #output > div {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        #id-card {
+            animation: fadeInLeft 0.5s ease-out;
+            perspective: 1000px; /* For 3D effect */
+            height: 100vh;
+            overflow-y: auto;
+            position: relative; /* Needed for gradient overlay */
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+        #id-card::-webkit-scrollbar {
+            display: none;
+        }
+        #id-card::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 75px;
+            background: linear-gradient(to top, var(--card-bg-color), transparent);
+            pointer-events: none;
+        }
+
+        #id-card > *,
+        #id-card .text-left > * {
+            animation: fadeIn 0.6s ease-out forwards;
+            opacity: 0;
+        }
+        #profile-pic {
+            animation-name: zoomIn;
+            animation-duration: 0.7s;
+            transition: transform 0.2s ease-out;
+        }
+        #id-card h1 { animation-delay: 0.2s; }
+        #id-card .h-1 { animation-delay: 0.3s; }
+        #id-card > p { animation-delay: 0.4s; }
+        
+        #id-card .text-left > h2:nth-of-type(1) { animation-delay: 0.5s; }
+        #id-card .text-left > ul { animation-delay: 0.6s; }
+        #id-card .text-left > h2:nth-of-type(2) { animation-delay: 0.7s; }
+        #id-card .text-left > a[href*="drive.google.com"] { animation-delay: 0.8s; }
+        #id-card .text-left > h2:nth-of-type(3) { animation-delay: 0.9s; }
+        #id-card .text-left > #theme-buttons { animation-delay: 1s; }
+
+
+        .glitch-effect {
+            animation: glitch 1s 1;
+            animation-delay: 0.5s;
+        }
+        #prompt {
+            animation: pulse 2s ease-in-out infinite;
+        }
+        .theme-btn {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--prompt-color);
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+        .theme-btn:hover {
+            background-color: var(--prompt-color);
+            color: var(--bg-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        a.blue-color:hover {
+            transform: translateY(-2px);
+            display: inline-block;
+        }
+        #matrix-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            display: none; /* Hidden by default */
+        }
+
+        /* --- SKILL ITEM ANIMATION --- */
+        .skill-item {
+            opacity: 0;
+            animation: fadeInUp 0.5s ease-out forwards;
+            margin-bottom: 0.5rem; /* Add some spacing */
+        }
+
+        /* --- PROJECT CARD --- */
+        .project-card {
+            background-color: var(--card-bg-color);
+            border: 1px solid var(--prompt-color);
+            padding: 1.5rem; /* Increased padding */
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            position: relative;
+            min-height: 100px; /* Increased min-height */
+            display: flex; 
+            flex-direction: column; /* Align content vertically */
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            opacity: 0;
+            animation: fadeInUp 0.6s ease-out forwards;
+            transition: transform 0.3s ease-out, box-shadow 0.3s ease-out;
+            overflow: hidden; /* Hide overflowing pseudo-elements */
+        }
+        .project-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4), 0 0 15px var(--prompt-color);
+        }
+        .project-front, .project-back {
+            width: 100%; 
+        }
+        .project-back {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(27, 38, 59, 0.9); /* Semi-transparent overlay */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            opacity: 0;
+            transition: opacity 0.4s ease-in-out;
+        }
+        .project-card:hover .project-back {
+            opacity: 1;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="flex flex-col md:flex-row min-h-screen">
+        <!-- Left Side: ID Card -->
+        <div id="id-card" class="w-full md:w-1/3 lg:w-1/4 card-bg-color p-8 flex flex-col items-center text-center shadow-2xl">
+            <img 
+                id="profile-pic"
+                src="./linkedin_pic.jpg" 
+                alt="Vyshnavi's Photo" 
+                class="rounded-full w-36 h-36 border-4 border-[var(--prompt-color)] object-cover mb-4"
+                onerror="this.onerror=null;this.src='https://placehold.co/150x150/e2e8f0/334155?text=Vyshnavi';"
+            >
+            
+            <h1 class="text-3xl font-bold prompt-color">Portfolio</h1>
+            <div class="w-20 h-1 bg-[var(--prompt-color)] my-4 rounded h-1"></div>
+            
+            <p class="mb-6">
+                Hello! I'm Vyshnavi, a passionate developer with a love for creating innovative and efficient solutions. I specialize in front-end development with a keen eye for design and user experience.
+            </p>
+
+            <div class="text-left w-full">
+                <h2 class="text-xl prompt-color mb-3">Contact Me</h2>
+                <ul class="space-y-2 mb-6">
+                    <li><span class="cyan-color mr-2">Email:</span> <a href="mailto:vyshnavijayanthi8@gmail.com" class="blue-color underline hover:opacity-80">vyshnavijayanthi8@gmail.com</a></li>
+                    <li><span class="cyan-color mr-2">LinkedIn:</span> <a href="https://linkedin.com/in/vyshnavi-jayanthi-1488622bb" target="_blank" class="blue-color underline hover:opacity-80">linkedin.com/in/vyshnavi-jayanthi</a></li>
+                    <li><span class="cyan-color mr-2">GitHub:</span> <a href="https://github.com/NagaVyshnaviJ" target="_blank" class="blue-color underline hover:opacity-80">github.com/NagaVyshnaviJ</a></li>
+                </ul>
+
+                <h2 class="text-xl prompt-color mb-3">My Resume</h2>
+                <a href="https://drive.google.com/file/d/1sBvwiZsLG9USbhLBXaGfzrUuNw2A_xCD/view?usp=sharing" target="_blank" class="blue-color underline hover:opacity-80 mb-6 block">View or Download</a>
+
+                <h2 class="text-xl prompt-color mb-3">Themes</h2>
+                <div id="theme-buttons" class="flex flex-wrap">
+                    <button class="theme-btn" data-theme="dark">dark</button>
+                    <button class="theme-btn" data-theme="light">light</button>
+                    <button class="theme-btn" data-theme="solarized">solarized</button>
+                    <button class="theme-btn" data-theme="matrix">matrix</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side: Terminal -->
+        <div id="terminal-container" class="w-full md:w-2/3 lg:w-3/4">
+            <canvas id="matrix-canvas"></canvas>
+            <div id="terminal" class="p-4 md:p-8 overflow-y-auto">
+                <div id="output"></div>
+                <div class="flex items-center">
+                    <span id="prompt" class="prompt-color">vyshnavi@portfolio:~$</span>
+                    <input type="text" id="input" class="ml-2 p-0 m-0" autofocus autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM ELEMENTS ---
+        const terminal = document.getElementById('terminal');
+        const output = document.getElementById('output');
+        const input = document.getElementById('input');
+        const promptEl = document.getElementById('prompt');
+        const themeButtonsContainer = document.getElementById('theme-buttons');
+        const idCard = document.getElementById('id-card');
+        const profilePic = document.getElementById('profile-pic');
+        const matrixCanvas = document.getElementById('matrix-canvas');
+
+        // --- USER DATA & STATE ---
+        let commandHistory = [];
+        let historyIndex = -1;
+        let currentDirectory = '~';
+        let matrixInterval;
+
+        const portfolioData = {
+            banner: `
+__      __  _               
+\\ \\    / /__| | ___ ___  _ __ ___   ___  
+ \\ \\ /\\ / / _ \\ |/ __/ _ \\| '_ \\\` _ \\ / _ \\ 
+  \\ V  V /  __/ | (_| (_) | | | | | | |  __/ 
+   \\_/\\_/ \\___|_|\\___\\___/|_| |_| |_|\\___| 
+
+`,
+            welcome: "This is my interactive portfolio.\nType 'help' to see the list of available commands.",
+            skills: {
+                'languages': ['JavaScript (ES6+)', 'HTML5', 'CSS3', 'Python','Java', 'C'],
+                'frameworks': ['React', 'Django', 'Angular'],
+                'tools': ['Git & GitHub', 'PyCharm', 'Vscode', 'Figma']
+            },
+            projects: {
+                'AIResearchAgent': { name: 'AIResearchAgent', description: 'A web-based AI agent that researches topics and generates reports using the Gemini API.', url: 'https://github.com/NagaVyshnaviJ/AIResearchAgent' },
+                'EcoRouteCompass': { name: 'EcoRouteCompass', description: 'Eco-friendly travel route planning application', url: 'https://github.com/NagaVyshnaviJ/ecoroute-app' },
+                'LaptopRequestCatalogItem': { name: 'LaptopRequestCatalogItem', description: 'This project is a ServiceNow Catalog Item called Laptop Request, built on a PDI (Personal Developer Instance).', url: 'https://github.com/NagaVyshnaviJ/Laptop-Request-Catalog-Item-ServiceNow-' },
+                'University_Evoting_portal': { name: 'University_Evoting_portal', description: 'A university voting system using Django', url: 'https://github.com/NagaVyshnaviJ/e-voting_django' }
+            },
+            certificates: {
+                'smart_coder': { name: 'Smart Coder(Smart Interviews)', issuer: 'Smart Interviews', url: 'https://drive.google.com/file/d/14KaFast5VvEZbRGx6hVj5SaGo7Be0LDv/view?usp=sharing' },
+                'Certified_System_Administrator': { name: 'Certified System Administrator', issuer: 'Service Now', url: 'https://drive.google.com/file/d/1b9GlFsS5WGmQRTU3mG04baK5_xRlntlT/view?usp=sharing' },
+                'Certified_Application_Developer': { name: 'Certified Application Developer', issuer: 'Service Now', url: 'https://drive.google.com/file/d/19l9eNbwyLjdGaextAU2KSFdkM4-drFv7/view?usp=sharing' },
+                'Web_development': { name: 'Web Development Training', issuer: 'Intershala', url: 'https://drive.google.com/file/d/1tAAZjum2mXE5xVwGC7iV6jWYIySj9enB/view?usp=sharing' }
+            },
+            education: {
+                'bachelor_of_tech': { degree: 'Bachelor of Technology, Computer Science and Engineering(AIML)', institution: 'Srinivasa Ramanujan Institute of Technology', years: '2022 - 2026', cgpa: '9.35' },
+                'intermediate': { degree: 'Intermediate Education', institution: 'Narayana Junior College', years: '2020 - 2022', percentage: '95%' },
+                'Secondary_Details': { degree: 'Secondary Education', institution: 'Prasad Talent School', years: '2019 - 2020', percentage: '96%' }
+            },
+            resume: { url: 'https://drive.google.com/file/d/1sBvwiZsLG9USbhLBXaGfzrUuNw2A_xCD/view?usp=sharing' },
+            socials: {
+                'LinkedIn': 'https://linkedin.com/in/vyshnavi-jayanthi-1488622bb',
+                'GitHub': 'https://github.com/NagaVyshnaviJ',
+            }
+        };
+
+        const fileSystem = {
+            '~': ['projects', 'certificates', 'education', 'skills'],
+            '~/projects': Object.keys(portfolioData.projects),
+            '~/certificates': Object.keys(portfolioData.certificates),
+            '~/education': Object.keys(portfolioData.education),
+            '~/skills': Object.keys(portfolioData.skills)
+        };
+
+        const themes = {
+            dark: { '--bg-color': '#111827', '--text-color': '#f3f4f6', '--prompt-color': '#4ade80', '--cyan-color': '#22d3ee', '--blue-color': '#60a5fa', '--card-bg-color': '#1f2937' },
+            light: { '--bg-color': '#f3f4f6', '--text-color': '#111827', '--prompt-color': '#16a34a', '--cyan-color': '#0891b2', '--blue-color': '#2563eb', '--card-bg-color': '#e5e7eb' },
+            solarized: { '--bg-color': '#002b36', '--text-color': '#839496', '--prompt-color': '#859900', '--cyan-color': '#2aa198', '--blue-color': '#268bd2', '--card-bg-color': '#073642' },
+            matrix: { '--bg-color': '#000000', '--text-color': '#00ff00', '--prompt-color': '#00ff00', '--cyan-color': '#00ff00', '--blue-color': '#00ff00', '--card-bg-color': '#0a0a0a' }
+        };
+
+        // --- UTILITY FUNCTIONS ---
+        function printLine(text, options = {}) {
+            const { isCommand = false, isBanner = false } = options;
+            
+            const line = document.createElement('div');
+            if (isCommand) {
+                line.innerHTML = `<span class="prompt-color">${promptEl.textContent}</span><span class="ml-2">${text}</span>`;
+            } else {
+                line.style.whiteSpace = 'pre-wrap';
+                if (isBanner) {
+                    line.classList.add('prompt-color', 'glitch-effect');
+                }
+                line.innerHTML = text;
+            }
+            output.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function typeWriter(text, element, callback) {
+            let i = 0;
+            element.innerHTML = '';
+            function type() {
+                if (i < text.length) {
+                    element.innerHTML += text.charAt(i);
+                    i++;
+                    setTimeout(type, 25);
+                } else if (callback) {
+                    callback();
+                }
+            }
+            type();
+        }
+        
+        function applyTheme(themeName) {
+            if (themes[themeName]) {
+                Object.keys(themes[themeName]).forEach(key => {
+                    document.documentElement.style.setProperty(key, themes[themeName][key]);
+                });
+
+                if (themeName === 'matrix') {
+                    startMatrix();
+                } else {
+                    stopMatrix();
+                }
+
+                printLine(`Theme set to ${themeName}.`);
+            } else {
+                printLine(`Theme not found. Available themes: ${Object.keys(themes).join(', ')}.`);
+            }
+        }
+
+        // --- MATRIX EFFECT ---
+        function startMatrix() {
+            matrixCanvas.style.display = 'block';
+            const ctx = matrixCanvas.getContext('2d');
+            matrixCanvas.width = matrixCanvas.offsetWidth;
+            matrixCanvas.height = matrixCanvas.offsetHeight;
+            
+            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789@#$%^&*()*&^%';
+            const fontSize = 16;
+            const columns = matrixCanvas.width / fontSize;
+            const drops = Array(Math.floor(columns)).fill(1);
+
+            function drawMatrix() {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                ctx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--prompt-color');
+                ctx.font = `${fontSize}px Fira Code`;
+
+                for (let i = 0; i < drops.length; i++) {
+                    const text = letters[Math.floor(Math.random() * letters.length)];
+                    ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                    if (drops[i] * fontSize > matrixCanvas.height && Math.random() > 0.975) {
+                        drops[i] = 0;
+                    }
+                    drops[i]++;
+                }
+            }
+            if (matrixInterval) clearInterval(matrixInterval);
+            matrixInterval = setInterval(drawMatrix, 33);
+        }
+
+        function stopMatrix() {
+            matrixCanvas.style.display = 'none';
+            clearInterval(matrixInterval);
+        }
+
+        // --- COMMANDS ---
+        const commands = {
+            help: () => {
+                return `Available commands:\n
+<span class="prompt-color">File System:</span>
+  ls          - List files and directories
+  cd [dir]    - Change directory
+  cat [file]  - Display file content
+
+<span class="prompt-color">Portfolio:</span>
+  summary     - Display a summary of my profile
+  skills      - My technical skills
+  projects    - My recent work
+  certificates- My certifications
+  education   - My educational background
+  socials     - My social media links
+  resume      - View or download my resume
+
+<span class="prompt-color">System & Fun:</span>
+  theme [name]- Change theme (dark, light, solarized, matrix)
+  banner      - Display the welcome banner
+  clear       - Clear the terminal screen
+  date        - Display the current date
+`;
+            },
+            theme: (args) => {
+                applyTheme(args[0]);
+                return '';
+            },
+            summary: () => {
+                return `<pre class="prompt-color">
+    /\\_/\\
+   ( o.o )    <span class="cyan-color">Vyshnavi's Portfolio</span>
+    > ^ <     --------------------
+              <span class="cyan-color">OS:</span>       Web Browser
+              <span class="cyan-color">Status:</span>   Aspiring Developer
+              <span class="cyan-color">Shell:</span>    portfolio.js
+              <span class="cyan-color">Skills:</span>   JS, React, Python
+</pre>`;
+            },
+            socials: () => {
+                let socialsOutput = 'My social links:\n\n';
+                for (const [name, url] of Object.entries(portfolioData.socials)) {
+                    socialsOutput += `<span class="cyan-color">${name}:</span> <a href="${url}" target="_blank" class="blue-color underline hover:opacity-80">${url}</a>\n`;
+                }
+                return socialsOutput;
+            },
+            ls: () => {
+                return fileSystem[currentDirectory].join('\n');
+            },
+            cd: (args) => {
+                const dir = args[0];
+                if (!dir) return 'Please specify a directory.';
+                if (dir === '..') {
+                    if (currentDirectory !== '~') {
+                        currentDirectory = '~';
+                    }
+                } else {
+                    const newDir = currentDirectory === '~' ? `~/${dir}` : `${currentDirectory}/${dir}`;
+                    if (fileSystem[newDir]) {
+                        currentDirectory = newDir;
+                    } else if (fileSystem[`~/${dir}`]) {
+                        currentDirectory = `~/${dir}`;
+                    } else {
+                        return `Directory not found: ${dir}`;
+                    }
+                }
+                promptEl.textContent = `vyshnavi@portfolio:${currentDirectory}$`;
+                return '';
+            },
+            cat: (args) => {
+                const fileName = args[0];
+                if (!fileName) return 'Please specify a file to read.';
+                
+                const currentFiles = fileSystem[currentDirectory];
+                if (!currentFiles.includes(fileName)) return `File not found: ${fileName}`;
+
+                let data;
+                if (currentDirectory === '~/projects') data = portfolioData.projects[fileName];
+                if (currentDirectory === '~/certificates') data = portfolioData.certificates[fileName];
+                if (currentDirectory === '~/education') data = portfolioData.education[fileName];
+                if (currentDirectory === '~/skills') data = portfolioData.skills[fileName];
+
+                if (data) {
+                    let dataOutput = '';
+                    if (Array.isArray(data)) {
+                        dataOutput = data.join(', ');
+                    } else {
+                        for (const [key, value] of Object.entries(data)) {
+                            if (key === 'url') {
+                                dataOutput += `<span class="cyan-color">${key.charAt(0).toUpperCase() + key.slice(1)}:</span> <a href="${value}" target="_blank" class="blue-color underline">${value}</a>\n`;
+                            } else {
+                                dataOutput += `<span class="cyan-color">${key.charAt(0).toUpperCase() + key.slice(1)}:</span> ${value}\n`;
+                            }
+                        }
+                    }
+                    return dataOutput;
+                }
+                return `Cannot read file: ${fileName}`;
+            },
+            skills: () => {
+                let skillsOutput = 'My technical skills:\n\n';
+                let delay = 0;
+                for (const category in portfolioData.skills) {
+                    const capitalizedCategory = category.charAt(0).toUpperCase() + category.slice(1);
+                    skillsOutput += `<div class="skill-item" style="animation-delay: ${delay * 0.1}s"><span class="cyan-color">${capitalizedCategory}:</span></div>\n`;
+                    delay++;
+                    portfolioData.skills[category].forEach(skill => {
+                        skillsOutput += `<div class="skill-item" style="animation-delay: ${delay * 0.1}s">${skill}</div>`;
+                        delay++;
+                    });
+                    skillsOutput += '\n';
+                }
+                return skillsOutput;
+            },
+            projects: () => {
+                let projectsOutput = 'My recent projects (hover to see details):\n\n';
+                let index = 0;
+                for (const key in portfolioData.projects) {
+                    const p = portfolioData.projects[key];
+                    projectsOutput += `
+                            <div class="project-card" style="animation-delay: ${index * 0.15}s">
+                                <div class="project-front">
+                                    <h3 class="cyan-color text-lg font-bold">${p.name}</h3>
+                                </div>
+                                <div class="project-back">
+                                    <p>${p.description}</p>
+                                    <a href="${p.url}" target="_blank" class="blue-color underline mt-2 inline-block">View on GitHub</a>
+                                </div>
+                            </div>`;
+                    index++;
+                }
+                return projectsOutput;
+            },
+            certificates: () => {
+                let certsOutput = 'My certifications:\n\n';
+                for (const key in portfolioData.certificates) {
+                    const c = portfolioData.certificates[key];
+                    certsOutput += `<span class="cyan-color">${c.name}</span> - ${c.issuer}\n<a href="${c.url}" target="_blank" class="blue-color underline">${c.url}</a>\n\n`;
+                }
+                return certsOutput;
+            },
+            education: () => {
+                let eduOutput = 'My Education:\n\n';
+                for (const key in portfolioData.education) {
+                    const e = portfolioData.education[key];
+                    eduOutput += `<span class="cyan-color">${e.degree}</span>\n${e.institution} (${e.years})\n`;
+                    if (e.cgpa) eduOutput += `CGPA: ${e.cgpa}\n`;
+                    if (e.percentage) eduOutput += `Percentage: ${e.percentage}\n`;
+                    eduOutput += '\n';
+                }
+                return eduOutput;
+            },
+            resume: () => {
+                window.open(portfolioData.resume.url, '_blank');
+                return 'Opening resume...';
+            },
+            clear: () => {
+                output.innerHTML = '';
+                return '';
+            },
+            banner: () => 'banner',
+            date: () => new Date().toString(),
+        };
+
+        // --- MAIN APP LOGIC ---
+        function handleCommand(command) {
+            printLine(command, { isCommand: true });
+
+            const commandParts = command.trim().split(' ');
+            const commandName = commandParts[0].toLowerCase();
+            const args = commandParts.slice(1);
+
+            if (commandName in commands) {
+                const result = commands[commandName](args);
+                if (result === 'banner') {
+                    printLine(portfolioData.banner, { isBanner: true });
+                    printLine(portfolioData.welcome);
+                } else if (result) {
+                    printLine(result);
+                }
+            } else if (command.trim() !== '') {
+                printLine(`Command not found: ${command}. Type 'help' for a list of commands.`);
+            }
+        }
+        
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const command = input.value.trim();
+                
+                if (command !== '') {
+                    commandHistory.unshift(command);
+                    historyIndex = -1;
+                    handleCommand(command);
+                    input.value = '';
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    input.value = commandHistory[historyIndex];
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    input.value = commandHistory[historyIndex];
+                } else {
+                    historyIndex = -1;
+                    input.value = '';
+                }
+            }
+        });
+
+        // --- 3D Profile Pic Effect ---
+        idCard.addEventListener('mousemove', (e) => {
+            const { left, top, width, height } = idCard.getBoundingClientRect();
+            const x = e.clientX - left - width / 2;
+            const y = e.clientY - top - height / 2;
+            const rotateY = (x / width) * 20; // Max rotation 10 degrees
+            const rotateX = -(y / height) * 20; // Max rotation 10 degrees
+            profilePic.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.05)`;
+        });
+
+        idCard.addEventListener('mouseleave', () => {
+            profilePic.style.transform = 'rotateX(0) rotateY(0) scale(1)';
+        });
+
+
+        document.getElementById('terminal-container').addEventListener('click', () => {
+            input.focus();
+        });
+
+        themeButtonsContainer.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                const themeName = e.target.dataset.theme;
+                handleCommand(`theme ${themeName}`);
+            }
+        });
+
+        const init = () => {
+            printLine(portfolioData.banner, { isBanner: true });
+            const welcomeLine = document.createElement('div');
+            output.appendChild(welcomeLine);
+            typeWriter(portfolioData.welcome, welcomeLine, () => {
+                input.focus();
+            });
+        };
+
+        init();
+    </script>
+</body>
+</html>
